@@ -28,8 +28,7 @@ SOURCES_CXX := \
    $(CORE_DIR)/lynx/system.cpp \
    $(CORE_DIR)/lynx/eeprom.cpp \
    $(CORE_DIR)/libretro/libretro.cpp \
-   $(CORE_DIR)/blip/Blip_Buffer.cpp \
-   $(CORE_DIR)/blip/Stereo_Buffer.cpp
+   $(CORE_DIR)/blip/Blip_Buffer.cpp
 
 ifneq ($(STATIC_LINKING), 1)
 SOURCES_C := \

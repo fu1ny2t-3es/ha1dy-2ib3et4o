@@ -6,6 +6,7 @@
 #include <streams/file_stream.h>
 
 #include "handy.h"
+#include "border.h"
 
 #ifdef _3DS
 extern "C" void* linearMemAlign(size_t size, size_t alignment);
@@ -25,6 +26,11 @@ static int16_t *soundBuffer = NULL;
 
 #define RETRO_LYNX_WIDTH  160
 #define RETRO_LYNX_HEIGHT 102
+#define RETRO_LYNX_PITCH  RETRO_LYNX_WIDTH
+
+#define RETRO_LYNX_WIDTH_BORDER  188
+#define RETRO_LYNX_HEIGHT_BORDER 164
+#define RETRO_LYNX_PITCH_BORDER  RETRO_LYNX_WIDTH_BORDER
 
 #define RETRO_LYNX_ROTATE_AUTO 255
 
@@ -38,10 +44,16 @@ static bool retro_refresh_rate_updated = false;
 
 // core options
 static uint8_t lynx_rot         = RETRO_LYNX_ROTATE_AUTO;
-static uint8_t lynx_width       = RETRO_LYNX_WIDTH;
-static uint8_t lynx_height      = RETRO_LYNX_HEIGHT;
-static uint8_t lynx_width_next  = RETRO_LYNX_WIDTH;
-static uint8_t lynx_height_next = RETRO_LYNX_HEIGHT;
+
+static uint8_t lynx_width_crop  = RETRO_LYNX_WIDTH_BORDER - RETRO_LYNX_WIDTH;
+static uint8_t lynx_height_crop = RETRO_LYNX_HEIGHT_BORDER - RETRO_LYNX_HEIGHT;
+
+static uint8_t lynx_width       = RETRO_LYNX_WIDTH + lynx_width_crop;
+static uint8_t lynx_height      = RETRO_LYNX_HEIGHT + lynx_height_crop;
+static uint8_t lynx_width_next  = RETRO_LYNX_WIDTH + lynx_width_crop;
+static uint8_t lynx_height_next = RETRO_LYNX_HEIGHT + lynx_height_crop;
+
+int lynx_audio_sample_rate = 48000;
 
 typedef enum
 {
@@ -61,6 +73,7 @@ static int RETRO_PIX_DEPTH = 15;
 #endif
 
 static uint8_t *framebuffer = NULL;
+static uint8_t *framebuffer_border = NULL;
 
 static bool frame_available   = false;
 static bool initialized       = false;
@@ -140,6 +153,8 @@ static bool update_audio_latency           = false;
 static bool libretro_supports_option_categories = false;
 
 static unsigned retro_overclock = 1;
+
+extern "C" {
 
 static void retro_audio_buff_status_cb(
       bool active, unsigned occupancy, bool underrun_likely)
@@ -600,7 +615,7 @@ static UBYTE* lynx_display_callback(ULONG objref)
    {
       if (gSkipFrame)
          video_cb(NULL, lynx_width, lynx_height,
-               RETRO_LYNX_WIDTH * RETRO_PIX_BYTES);
+               RETRO_LYNX_PITCH_BORDER * RETRO_PIX_BYTES);
       else
       {
          /* Check whether current frame has a different
@@ -617,8 +632,40 @@ static UBYTE* lynx_display_callback(ULONG objref)
          if (lcd_ghosting_apply)
             lcd_ghosting_apply();
 
-         video_cb(framebuffer, lynx_width, lynx_height,
-               RETRO_LYNX_WIDTH * RETRO_PIX_BYTES);
+         uint8_t *src = framebuffer;
+         uint8_t *dst = framebuffer_border;
+
+         if (lynx_rot == MIKIE_ROTATE_L || lynx_rot == MIKIE_ROTATE_R) {
+            dst += ((RETRO_LYNX_WIDTH_BORDER - RETRO_LYNX_WIDTH) / 2) * RETRO_LYNX_PITCH_BORDER * RETRO_PIX_BYTES;
+            dst += ((RETRO_LYNX_HEIGHT_BORDER - RETRO_LYNX_HEIGHT) / 2) * RETRO_PIX_BYTES;
+
+            for (int lcv = 0; lcv < RETRO_LYNX_WIDTH; lcv++) {
+               memcpy(dst, src, RETRO_LYNX_HEIGHT * RETRO_PIX_BYTES);
+               dst += RETRO_LYNX_PITCH_BORDER * RETRO_PIX_BYTES;
+               src += RETRO_LYNX_PITCH * RETRO_PIX_BYTES;
+            }
+
+            dst = framebuffer_border;
+            dst += ((RETRO_LYNX_WIDTH_BORDER - RETRO_LYNX_WIDTH - lynx_width_crop) / 2) * RETRO_LYNX_PITCH_BORDER * RETRO_PIX_BYTES;
+            dst += ((RETRO_LYNX_HEIGHT_BORDER - RETRO_LYNX_HEIGHT - lynx_height_crop) / 2) * RETRO_PIX_BYTES;
+         }
+         else {
+            dst += ((RETRO_LYNX_HEIGHT_BORDER - RETRO_LYNX_HEIGHT) / 2) * RETRO_LYNX_PITCH_BORDER * RETRO_PIX_BYTES;
+            dst += ((RETRO_LYNX_WIDTH_BORDER - RETRO_LYNX_WIDTH) / 2) * RETRO_PIX_BYTES;
+
+            for (int lcv = 0; lcv < RETRO_LYNX_HEIGHT; lcv++) {
+               memcpy(dst, src, RETRO_LYNX_WIDTH * RETRO_PIX_BYTES);
+               dst += RETRO_LYNX_PITCH_BORDER * RETRO_PIX_BYTES;
+               src += RETRO_LYNX_PITCH * RETRO_PIX_BYTES;
+            }
+
+            dst = framebuffer_border;
+            dst += ((RETRO_LYNX_HEIGHT_BORDER - RETRO_LYNX_HEIGHT - lynx_height_crop) / 2) * RETRO_LYNX_PITCH_BORDER * RETRO_PIX_BYTES;
+            dst += ((RETRO_LYNX_WIDTH_BORDER - RETRO_LYNX_WIDTH - lynx_width_crop) / 2) * RETRO_PIX_BYTES;
+         }
+
+         video_cb(dst, lynx_width, lynx_height,
+               RETRO_LYNX_PITCH_BORDER * RETRO_PIX_BYTES);
       }
 
       /* Check whether the next frame should be
@@ -669,27 +716,31 @@ static void lynx_rotate(void)
          // intentional fall-through
 
       case MIKIE_NO_ROTATE:
-         lynx_width_next  = RETRO_LYNX_WIDTH;
-         lynx_height_next = RETRO_LYNX_HEIGHT;
+         lynx_width_next  = RETRO_LYNX_WIDTH + lynx_width_crop;
+         lynx_height_next = RETRO_LYNX_HEIGHT + lynx_height_crop;
          btn_map          = btn_map_no_rot;
+		 memcpy(framebuffer_border, lynx_border_0, sizeof(lynx_border_0));
          break;
 
       case MIKIE_ROTATE_R:
-         lynx_width_next  = RETRO_LYNX_HEIGHT;
-         lynx_height_next = RETRO_LYNX_WIDTH;
+         lynx_width_next  = RETRO_LYNX_HEIGHT + lynx_height_crop;
+         lynx_height_next = RETRO_LYNX_WIDTH + lynx_width_crop;
          btn_map          = btn_map_rot_90;
+         memcpy(framebuffer_border, lynx_border_90, sizeof(lynx_border_90));
          break;
 
       case MIKIE_ROTATE_B:
-         lynx_width_next  = RETRO_LYNX_WIDTH;
-         lynx_height_next = RETRO_LYNX_HEIGHT;
+         lynx_width_next  = RETRO_LYNX_WIDTH + lynx_width_crop;
+         lynx_height_next = RETRO_LYNX_HEIGHT + lynx_height_crop;
          btn_map          = btn_map_rot_180;
+         memcpy(framebuffer_border, lynx_border_180, sizeof(lynx_border_180));
          break;
 
       case MIKIE_ROTATE_L:
-         lynx_width_next  = RETRO_LYNX_HEIGHT;
-         lynx_height_next = RETRO_LYNX_WIDTH;
+         lynx_width_next  = RETRO_LYNX_HEIGHT + lynx_height_crop;
+         lynx_height_next = RETRO_LYNX_WIDTH + lynx_width_crop;
          btn_map          = btn_map_rot_270;
+         memcpy(framebuffer_border, lynx_border_270, sizeof(lynx_border_270));
          break;
    }
 
@@ -737,6 +788,7 @@ static void check_variables(void)
    unsigned old_lynx_rot;
    unsigned old_frameskip_type;
    uint16_t old_retro_refresh_rate;
+   unsigned old_value;
    lynx_lcd_ghosting_t old_lynx_lcd_ghosting;
 
    old_lynx_rot = lynx_rot;
@@ -815,7 +867,7 @@ static void check_variables(void)
    {
       retro_refresh_rate = strtol(var.value, NULL, 10);
       retro_refresh_rate = (retro_refresh_rate < 50)  ? 50 : retro_refresh_rate;
-      retro_refresh_rate = (retro_refresh_rate > 120) ? 50 : retro_refresh_rate;
+      retro_refresh_rate = (retro_refresh_rate > 120) ? 120 : retro_refresh_rate;
    }
 
    retro_cycles_per_frame = (HANDY_SYSTEM_FREQ / retro_refresh_rate);
@@ -849,6 +901,71 @@ static void check_variables(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
       retro_overclock = atoi(var.value);
+   }
+
+   old_value             = lynx_width_crop;
+   var.key               = "handy_crop_side";
+   var.value             = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (strcmp(var.value, "disabled") == 0)
+         lynx_width_crop = RETRO_LYNX_WIDTH_BORDER - RETRO_LYNX_WIDTH;
+      else
+         lynx_width_crop = RETRO_LYNX_WIDTH_BORDER - RETRO_LYNX_WIDTH - atoi(var.value);
+   }
+
+   old_value             = lynx_height_crop;
+   var.key               = "handy_crop_top";
+   var.value             = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (strcmp(var.value, "disabled") == 0)
+         lynx_height_crop = RETRO_LYNX_HEIGHT_BORDER - RETRO_LYNX_HEIGHT;
+      else
+         lynx_height_crop = RETRO_LYNX_HEIGHT_BORDER - RETRO_LYNX_HEIGHT - atoi(var.value);
+   }
+
+   var.key               = "handy_audio_master_volume";
+   var.value             = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      int new_value = atoi(var.value);
+
+      if (initialized)
+         lynx->SetVolume(new_value);
+   }
+
+   var.key               = "handy_lowpass_filter";
+   var.value             = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      int new_value = atoi(var.value);
+
+      if (initialized)
+         lynx->SetLowpass(new_value);
+   }
+
+   var.key               = "handy_audio_lowpass_cutoff";
+   var.value             = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      int new_value = atoi(var.value);
+
+      if (initialized) {
+         extern void set_blip_cutoff(int rate);
+         set_blip_cutoff(new_value);
+      }
+   }
+
+   var.key               = "handy_audio_sample_rate";
+   var.value             = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      int new_value = atoi(var.value);
+
+      if (!initialized) {
+         lynx_audio_sample_rate = new_value;
+      }
    }
 }
 
@@ -908,10 +1025,10 @@ void retro_deinit(void)
    lynx_rotation_pending            = ROTATION_PENDING_NONE;
    lynx_rotation_button_down        = false;
    lynx_rot                         = RETRO_LYNX_ROTATE_AUTO;
-   lynx_width                       = RETRO_LYNX_WIDTH;
-   lynx_height                      = RETRO_LYNX_HEIGHT;
-   lynx_width_next                  = RETRO_LYNX_WIDTH;
-   lynx_height_next                 = RETRO_LYNX_HEIGHT;
+   lynx_width                       = RETRO_LYNX_WIDTH + lynx_width_crop;
+   lynx_height                      = RETRO_LYNX_HEIGHT + lynx_height_crop;
+   lynx_width_next                  = RETRO_LYNX_WIDTH + lynx_width_crop;
+   lynx_height_next                 = RETRO_LYNX_HEIGHT + lynx_height_crop;
    initialized                      = false;
    video_out_enabled                = false;
 }
@@ -986,12 +1103,12 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    memset(info, 0, sizeof(*info));
 
    info->timing.fps            = (double)retro_refresh_rate;
-   info->timing.sample_rate    = (double)HANDY_AUDIO_SAMPLE_FREQ;
+   info->timing.sample_rate    = (double)lynx_audio_sample_rate;
 
    info->geometry.base_width   = lynx_width;
    info->geometry.base_height  = lynx_height;
-   info->geometry.max_width    = RETRO_LYNX_WIDTH;
-   info->geometry.max_height   = RETRO_LYNX_WIDTH;
+   info->geometry.max_width    = RETRO_LYNX_PITCH;
+   info->geometry.max_height   = RETRO_LYNX_PITCH;
    info->geometry.aspect_ratio = (float)lynx_width / (float)lynx_height;
 }
 
@@ -1008,7 +1125,7 @@ void retro_run(void)
       int16_t ret = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0,
             RETRO_DEVICE_ID_JOYPAD_MASK);
       for (i = 0; i < sizeof(btn_map_no_rot) / sizeof(map); i++)
-         res |= ret & (1 << btn_map[i].retro) ? (btn_map[i].lynx) : 0;
+         res |= (ret & (1 << btn_map[i].retro)) ? (btn_map[i].lynx) : 0;
       select_button = ret & (1 << RETRO_DEVICE_ID_JOYPAD_SELECT);
    }
    else
@@ -1091,12 +1208,11 @@ void retro_run(void)
     * run, upload NULL */
    if (!frame_available)
       video_cb(NULL, lynx_width, lynx_height,
-            RETRO_LYNX_WIDTH * RETRO_PIX_BYTES);
+            RETRO_LYNX_PITCH_BORDER * RETRO_PIX_BYTES);
 
    lynx->FetchAudioSamples();
 
-   /* Divide gAudioBufferPointer by number of channels */
-   audio_batch_cb(soundBuffer, gAudioBufferPointer >> 1);
+   audio_batch_cb(soundBuffer, gAudioBufferPointer);
    gAudioBufferPointer = 0;
 }
 
@@ -1171,10 +1287,13 @@ bool retro_load_game(const struct retro_game_info *info)
    /* Allocate video buffer */
 #if defined(_3DS)
    framebuffer = (uint8_t*)linearMemAlign(
-         RETRO_LYNX_WIDTH * RETRO_LYNX_WIDTH * 4 * sizeof(uint8_t), 128);
+         RETRO_LYNX_PITCH * RETRO_LYNX_PITCH * 4 * sizeof(uint8_t), 128);
 #else
    framebuffer = (uint8_t*)calloc(1,
-         RETRO_LYNX_WIDTH * RETRO_LYNX_WIDTH * 4 * sizeof(uint8_t));
+         RETRO_LYNX_PITCH * RETRO_LYNX_PITCH * 4 * sizeof(uint8_t));
+
+   framebuffer_border = (uint8_t*)calloc(1,
+         RETRO_LYNX_PITCH_BORDER * RETRO_LYNX_PITCH_BORDER * 4 * sizeof(uint8_t));
 #endif
    if (!framebuffer)
       return false;
@@ -1271,6 +1390,7 @@ bool retro_load_game(const struct retro_game_info *info)
    initialized       = true;
    video_out_enabled = true;
 
+   check_variables();  /* reapply settings */
    return true;
 }
 
@@ -1304,4 +1424,6 @@ size_t retro_get_memory_size(unsigned type)
    if (type == RETRO_MEMORY_SYSTEM_RAM)
       return 1024 * 64;
    return 0;
+}
+
 }

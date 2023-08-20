@@ -51,6 +51,9 @@
 
 class CSystem;
 
+#include <blip/Blip_Buffer.h>
+
+
 #define MIKIE_START	0xfd00
 #define MIKIE_SIZE	0x100
 
@@ -163,18 +166,13 @@ enum
    MIKIE_PIXEL_FORMAT_32BPP,
 };
 
-#include <blip/Stereo_Buffer.h>
-
-typedef Blip_Synth<blip_good_quality, 256 * 4> Synth;
-
 class CMikie : public CLynxBase
 {
    public:
       CMikie(CSystem& parent);
       ~CMikie();
 
-      Synth miksynth;
-      Stereo_Buffer mikbuf;
+      blip_t *sblip;
 
       bool	ContextSave(LSS_FILE *fp);
       bool	ContextLoad(LSS_FILE *fp);
@@ -200,6 +198,9 @@ class CMikie : public CLynxBase
       ULONG	DisplayRenderLine(void);
       ULONG	DisplayEndOfFrame(void);
       void	AudioEndOfFrame(void);
+
+      void  SetVolume(int volume);
+      void  SetLowpass(int lowpass);
 
       inline void SetCPUSleep(void) {gSystemCPUSleep=TRUE;};
       inline void ClearCPUSleep(void) {gSystemCPUSleep=FALSE;gSystemCPUSleep_Saved=FALSE;};

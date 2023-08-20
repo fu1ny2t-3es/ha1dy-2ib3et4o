@@ -123,13 +123,16 @@ CSystem::CSystem(const char *gamefile,
    // Select the default filetype
    mFileType=HANDY_FILETYPE_ILLEGAL;
 
+handy_log(RETRO_LOG_DEBUG, "Loading cart\n");
    // Check whether a data buffer is provided
    if (gamedata && (gamesize != 0)) {
       game_memory      = gamedata;
       game_memory_size = gamesize;
+handy_log(RETRO_LOG_DEBUG, "Loading cart - buffer\n");
    }
    // Otherwise load data from file
    else if (!string_is_empty(gamefile)) {
+handy_log(RETRO_LOG_DEBUG, "Loading cart - file\n");
       RFILE *fp = NULL;
 
       // Open the cartridge file for reading
@@ -159,6 +162,7 @@ CSystem::CSystem(const char *gamefile,
       else
          handy_log(RETRO_LOG_ERROR, "Failed to open Cart file: %s\n", gamefile);
    }
+handy_log(RETRO_LOG_DEBUG, "Loading cart - done\n");
 
    // Try to determine the game (cartridge) type
    if (game_memory && (game_memory_size > 0)) {

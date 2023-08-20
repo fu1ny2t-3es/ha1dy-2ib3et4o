@@ -1,0 +1,15 @@
+Core
+- 384 KHz audio  [use frontend interpolation = extra low latency]
+- Audio buffer increased  [384K stereo]
+- Blip interpolation removed  [less fuzzy]
+- Blip stereo read buffer fix
+- LCD gamma ramp  [cgb curve = mostly brighter; not correct though]
+
+
+Libretro
+- Border skin added
+- O3 compile
+
+
+Compiler
+- Ternary () guards  [mingw32-gcc-posix = no mystery bugs]
