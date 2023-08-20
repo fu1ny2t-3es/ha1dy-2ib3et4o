@@ -1,6 +1,6 @@
 DEBUG = 0
 FRONTEND_SUPPORTS_RGB565 = 1
-FRONTEND_SUPPORTS_XRGB8888 = 0
+FRONTEND_SUPPORTS_XRGB8888 = 1
 
 TARGET_NAME := handy
 GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
@@ -600,7 +600,7 @@ OBJECTS := $(SOURCES_CXX:.cpp=.o) $(SOURCES_C:.c=.o)
 ifeq ($(DEBUG),1)
 FLAGS += -O0 -g
 else
-FLAGS += -O2 -DNDEBUG
+FLAGS += -O3 -DNDEBUG
 endif
 
 ifeq (,$(findstring msvc,$(platform)))

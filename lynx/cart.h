@@ -52,14 +52,14 @@
 #define __max(a,b) \
    ({ __typeof__ (a) _a = (a); \
     __typeof__ (b) _b = (b); \
-    _a > _b ? _a : _b; })
+    (_a > _b) ? _a : _b; })
 #endif
 
 #ifndef __min
 #define __min(a,b) \
    ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
-     _a > _b ? _b : _a; })
+     (_a > _b) ? _b : _a; })
 #endif
 
 #define DEFAULT_CART_CONTENTS	0xFF
@@ -68,7 +68,7 @@ enum CTYPE {UNUSED,C64K,C128K,C256K,C512K,C1024K};
 
 #define CART_NO_ROTATE		0
 #define CART_ROTATE_LEFT	1
-#define	CART_ROTATE_RIGHT	2
+#define CART_ROTATE_RIGHT	2
 
 #define CART_AUDIN  1
 

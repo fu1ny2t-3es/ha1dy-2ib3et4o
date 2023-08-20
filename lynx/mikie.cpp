@@ -55,6 +55,8 @@
 #include "lynxdef.h"
 #include "handy.h"
 
+int master_volume = 100;
+
 void CMikie::BlowOut(void)
 {
    char addr[100];
@@ -86,11 +88,8 @@ void CMikie::BlowOut(void)
    for(loop=0;loop<16;loop++) mPalette[loop].Index=loop;
    for(loop=0;loop<4096;loop++) mColourMap[loop]=0;
 
-   mikbuf.set_sample_rate(HANDY_AUDIO_SAMPLE_FREQ, 60);
-   mikbuf.clock_rate(HANDY_SYSTEM_FREQ / 4);
-   mikbuf.bass_freq(60);
-   miksynth.volume(0.50);
-   miksynth.treble_eq(0);
+   sblip = blip_new(HANDY_AUDIO_SAMPLE_FREQ / 10);
+   blip_set_rates(sblip, HANDY_SYSTEM_FREQ, HANDY_AUDIO_SAMPLE_FREQ);
 	
    Reset();
 }
@@ -755,7 +754,7 @@ bool CMikie::ContextLoad(LSS_FILE *fp)
    if(!lss_read(&mUART_PARITY_ENABLE,sizeof(ULONG),1,fp)) return 0;
    if(!lss_read(&mUART_PARITY_EVEN,sizeof(ULONG),1,fp)) return 0;
 
-   mikbuf.clear();
+   blip_clear(sblip);
    return 1;
 }
 
@@ -823,6 +822,16 @@ void CMikie::ComLynxTxCallback(void (*function)(int data,ULONG objref),ULONG obj
 }
 
 
+static inline uint8_t scale_channel_with_curve(uint8_t x)
+{
+	const uint8_t val[] = {0,6,12,20,28,36,45,56,66,76,88,100,113,125,137,149,161,172,182,192,202,210,218,225,232,238,243,247,250,252,254,255};
+
+	// 31.0 / 7.0
+	if(x < 8) return val[x*2+0];
+	if(x < 16) return val[x*2+1];
+}
+
+
 void CMikie::DisplaySetAttributes(ULONG Rotate,ULONG Format,ULONG Pitch,UBYTE* (*RenderCallback)(ULONG objref),ULONG objref)
 {
    mDisplayRotate=Rotate;
@@ -876,9 +885,25 @@ void CMikie::DisplaySetAttributes(ULONG Rotate,ULONG Format,ULONG Pitch,UBYTE* (
       case MIKIE_PIXEL_FORMAT_24BPP:
       case MIKIE_PIXEL_FORMAT_32BPP:
          for(Spot.Index=0;Spot.Index<4096;Spot.Index++) {
-            mColourMap[Spot.Index]=((Spot.Colours.Red<<20)&0x00f00000) | ((Spot.Colours.Red<<16)&0x000f0000);
-            mColourMap[Spot.Index]|=((Spot.Colours.Green<<12)&0x0000f000) | ((Spot.Colours.Green<<8)&0x00000f00);
-            mColourMap[Spot.Index]|=((Spot.Colours.Blue<<4)&0x000000f0) | ((Spot.Colours.Blue<<0)&0x0000000f);
+            unsigned red, green, blue;
+
+#if 0
+            red	= scale_channel_with_curve(Spot.Colours.Red);
+            green = scale_channel_with_curve(Spot.Colours.Green);
+            blue = scale_channel_with_curve(Spot.Colours.Blue);
+
+            mColourMap[Spot.Index]=(red<<16);
+            mColourMap[Spot.Index]|=(green<<8);
+            mColourMap[Spot.Index]|=(blue<<0);
+#else
+            red	= Spot.Colours.Red;
+            green = Spot.Colours.Green;
+            blue = Spot.Colours.Blue;
+
+            mColourMap[Spot.Index]=((red<<20)&0x00f00000) | ((red<<16)&0x000f0000);
+            mColourMap[Spot.Index]|=((green<<12)&0x0000f000) | ((green<<8)&0x00000f00);
+            mColourMap[Spot.Index]|=((blue<<4)&0x000000f0) | ((blue<<0)&0x0000000f);
+#endif
          }
          break;
       default:
@@ -1413,13 +1438,6 @@ ULONG CMikie::DisplayEndOfFrame(void)
    }
 
    return 0;
-}
-
-void	CMikie::AudioEndOfFrame(void)
-{
-   mikbuf.end_frame((gSystemCycleCount - gAudioLastUpdateCycle) / 4);
-   gAudioBufferPointer = mikbuf.read_samples((blip_sample_t*) gAudioBuffer, HANDY_AUDIO_BUFFER_SIZE / 2);
-   gAudioLastUpdateCycle = gSystemCycleCount;
 }
 
 // Peek/Poke memory handlers
@@ -3548,8 +3566,8 @@ inline void CMikie::Update(void)
 
 inline void CMikie::UpdateSound(void)
 {
-   int cur_lsample = 0;
-   int cur_rsample = 0;
+   int sample_l = 0;
+   int sample_r = 0;
    int x;
 
    for(x = 0; x < 4; x++){
@@ -3563,28 +3581,46 @@ inline void CMikie::UpdateSound(void)
 
       if(!(mSTEREO & (0x10 << x))) {
          if(mPAN & (0x10 << x))
-            cur_lsample += (mAUDIO_OUTPUT[x]*(mAUDIO_ATTEN[x]&0xF0))/(16*16); /// NOT /15*16 see remark above
+            sample_l += (mAUDIO_OUTPUT[x]*(mAUDIO_ATTEN[x]&0xF0))/(16*16); /// NOT /15*16 see remark above
          else
-            cur_lsample += mAUDIO_OUTPUT[x];
+            sample_l += mAUDIO_OUTPUT[x];
       }
       if(!(mSTEREO & (0x01 << x))) {
          if(mPAN & (0x01 << x))
-            cur_rsample += (mAUDIO_OUTPUT[x]*(mAUDIO_ATTEN[x]&0x0F))/16; /// NOT /15 see remark above
+            sample_r += (mAUDIO_OUTPUT[x]*(mAUDIO_ATTEN[x]&0x0F))/16; /// NOT /15 see remark above
          else
-            cur_rsample += mAUDIO_OUTPUT[x];
+            sample_r += mAUDIO_OUTPUT[x];
       }
    }
 
-   static int last_lsample = 0;
-   static int last_rsample = 0;
 
-   if(cur_lsample != last_lsample) {
-      miksynth.offset_inline((gSystemCycleCount - gAudioLastUpdateCycle) / 4, cur_lsample - last_lsample, mikbuf.left());
-      last_lsample = cur_lsample;
-   }
+   // Upsample to 16 bit signed
+   sample_l = ((sample_l << 6) * master_volume) / 100;
+   sample_r = ((sample_r << 6) * master_volume) / 100;
 
-   if(cur_rsample != last_rsample) {
-      miksynth.offset_inline((gSystemCycleCount - gAudioLastUpdateCycle) / 4, cur_rsample - last_rsample, mikbuf.right());
-      last_rsample = cur_rsample;
-   }
+   static int last_sample_l = 0;
+   static int last_sample_r = 0;
+
+   blip_add_delta(sblip, gSystemCycleCount - gAudioLastUpdateCycle, sample_l - last_sample_l, sample_r - last_sample_r);
+
+   last_sample_l = sample_l;
+   last_sample_r = sample_r;
 }
+
+void CMikie::AudioEndOfFrame(void)
+{
+   blip_end_frame(sblip, gSystemCycleCount - gAudioLastUpdateCycle);
+
+   gAudioBufferPointer = blip_read_samples(sblip, (short *)(gAudioBuffer), HANDY_AUDIO_BUFFER_SIZE / 4);
+   gAudioLastUpdateCycle = gSystemCycleCount;
+}
+
+void CMikie::SetVolume(int volume)
+{
+   master_volume = volume;
+}
+
+void CMikie::SetLowpass(int lowpass)
+{
+}
+

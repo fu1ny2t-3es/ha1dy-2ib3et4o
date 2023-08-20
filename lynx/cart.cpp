@@ -112,7 +112,8 @@ CCart::CCart(const UBYTE *gamedata, ULONG gamesize)
         strncpy((char*)&header.cartname,"NO HEADER",32);
         strncpy((char*)&header.manufname,"HANDY",16);
         header.page_size_bank0=gamesize>>8;// Hard workaround...
-      } else if(strcmp((char *)&header.cartname,"NO HEADER")!=0 || strcmp((char *)&header.manufname,"HANDY")!=0) {
+      }
+      else if(strcmp((char *)&header.cartname,"NO HEADER")!=0 || strcmp((char *)&header.manufname,"HANDY")!=0) {
          headersize=sizeof(LYNX_HEADER);
       }
 
@@ -249,26 +250,26 @@ CCart::CCart(const UBYTE *gamedata, ULONG gamesize)
          mCartBank0,
          gamedata+(headersize),
          bank0size);
-   cartsize = cartsize < bank0size ? 0 : cartsize - bank0size;
+   cartsize = (cartsize < bank0size) ? 0 : cartsize - bank0size;
 
    memcpy(
          mCartBank1,
          gamedata+(headersize + bank0size),
-         cartsize < bank1size ? cartsize : bank1size);
-   cartsize = cartsize < bank1size ? 0 : cartsize - bank1size;
+         (cartsize < bank1size) ? cartsize : bank1size);
+   cartsize = (cartsize < bank1size) ? 0 : cartsize - bank1size;
 
    if(mAudinFlag){// TODO clean up code
       memcpy(
             mCartBank0A,
             gamedata+(headersize+ bank0size + bank1size),
-            cartsize < bank0size ? cartsize : bank0size);
-      cartsize = cartsize < bank0size ? 0 : cartsize - bank0size;
+            (cartsize < bank0size) ? cartsize : bank0size);
+      cartsize = (cartsize < bank0size) ? 0 : cartsize - bank0size;
 
       memcpy(
             mCartBank1A,
             gamedata+(headersize + bank0size + bank1size + bank0size),
-            cartsize < bank1size ? cartsize : bank1size);
-      cartsize = cartsize < bank1size ? 0 : cartsize - bank1size;
+            (cartsize < bank1size) ? cartsize : bank1size);
+      cartsize = (cartsize < bank1size) ? 0 : cartsize - bank1size;
    }
 
    if(bank0size==0) bank0size=1;// workaround ...

@@ -52,13 +52,12 @@
 #include "machine.h"
 #include "errorinterface.h"
 
-#define HANDY_SYSTEM_FREQ                       16000000
+#define HANDY_SYSTEM_FREQ                       16777216
 #define HANDY_TIMER_FREQ                        20
-#define HANDY_AUDIO_SAMPLE_FREQ                 48000
-#define HANDY_AUDIO_SAMPLE_PERIOD               (HANDY_SYSTEM_FREQ/HANDY_AUDIO_SAMPLE_FREQ)
+#define HANDY_AUDIO_SAMPLE_FREQ                 768000
 #define HANDY_AUDIO_WAVESHAPER_TABLE_LENGTH     0x200000
 
-#define HANDY_AUDIO_BUFFER_SIZE                 (HANDY_AUDIO_SAMPLE_FREQ)
+#define HANDY_AUDIO_BUFFER_SIZE                 (HANDY_AUDIO_SAMPLE_FREQ / 50 * 4 * 2)
 
 
 #define HANDY_FILETYPE_LNX      0
@@ -206,6 +205,7 @@ class CSystem : public CSystemBase
          // Only update if there is a predicted timer event
          if(gSystemCycleCount>=gNextTimerEvent)
             mMikie->Update();
+
          // Step the processor through 1 instruction
          mCpu->Update();
 
@@ -229,6 +229,16 @@ class CSystem : public CSystemBase
       inline void FetchAudioSamples(void)
       {
          mMikie->AudioEndOfFrame();
+      }
+
+      inline void SetVolume(int volume)
+      {
+         mMikie->SetVolume(volume);
+      }
+
+      inline void SetLowpass(int lowpass)
+      {
+         mMikie->SetLowpass(lowpass);
       }
 
       //
