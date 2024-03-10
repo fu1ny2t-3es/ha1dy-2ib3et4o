@@ -4,24 +4,18 @@ CRC32 hash
 Software title
 File size
 
-00-03 = LYNX
-
-04-05 = Bank0 size
+Bank0 size:
 C64K   = 0x100
 C128K  = 0x200
 C256K  = 0x400
 C512K  = 0x800
 C1024K = 0x1000
 
-06-07 = Bank1 size
+Bank1 size
 
-08 = version #  (01)
-0a-29 = title
-2a-39 = publisher
-
-3a = Rotation
-3b = Audin
-3c = Eeprom
+Rotation
+Audin
+Eeprom
 */
 
 
@@ -51,5 +45,5 @@ static LYNX_DB lynxDB[] = {
    { 0x7f8b5efa, "Wyvern Tales (World) (Aftermarket) (Unl)", 524288, C512K, 0, 0, 0, CART_EEPROM_93C46 },
 
    // auto-detect
-   { 0, NULL, 0, 0, 0, 0, 0, 0 }
+   { 0, NULL, 0, 0, 0, 0, 0, 0 },
 };
