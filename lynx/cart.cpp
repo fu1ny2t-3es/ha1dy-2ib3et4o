@@ -112,8 +112,7 @@ CCart::CCart(const UBYTE *gamedata, ULONG gamesize)
         strncpy((char*)&header.cartname,"NO HEADER",32);
         strncpy((char*)&header.manufname,"HANDY",16);
         header.page_size_bank0=gamesize>>8;// Hard workaround...
-      }
-      else if(strcmp((char *)&header.cartname,"NO HEADER")!=0 || strcmp((char *)&header.manufname,"HANDY")!=0) {
+      } else if(strcmp((char *)&header.cartname,"NO HEADER")!=0 || strcmp((char *)&header.manufname,"HANDY")!=0) {
          headersize=sizeof(LYNX_HEADER);
       }
 
