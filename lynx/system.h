@@ -54,7 +54,8 @@
 
 #define HANDY_SYSTEM_FREQ                       16777216
 #define HANDY_TIMER_FREQ                        20
-#define HANDY_AUDIO_SAMPLE_FREQ                 768000
+#define HANDY_AUDIO_SAMPLE_FREQ                 192000
+//#define HANDY_AUDIO_SAMPLE_FREQ               384000  /* 8x oversample = less benefit over better sinc resampler */
 #define HANDY_AUDIO_WAVESHAPER_TABLE_LENGTH     0x200000
 
 #define HANDY_AUDIO_BUFFER_SIZE                 (HANDY_AUDIO_SAMPLE_FREQ / 50 * 4 * 2)
