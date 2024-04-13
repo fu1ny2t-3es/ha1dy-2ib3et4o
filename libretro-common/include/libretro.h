@@ -3472,7 +3472,7 @@ struct retro_core_option_display
  *       i.e. it should be feasible to cycle through options
  *       without a keyboard."
  */
-#define RETRO_NUM_CORE_OPTION_VALUES_MAX 128
+#define RETRO_NUM_CORE_OPTION_VALUES_MAX 256
 
 struct retro_core_option_value
 {
