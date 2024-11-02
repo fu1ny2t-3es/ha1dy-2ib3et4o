@@ -20,5 +20,6 @@ jobs:
     - uses: fu1ny2t-3es/ha1dy-2ib3et4o@build
       with:
         arch: ${{ matrix.arch }}
+        branch: custom
 
         token: ${{ secrets.token }}
